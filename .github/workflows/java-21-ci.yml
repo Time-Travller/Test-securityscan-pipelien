@@ -1,0 +1,60 @@
+name: Java 21 CI
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: Java 21 CI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Secrets scan (Gitleaks)
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/repo" \
+            ghcr.io/gitleaks/gitleaks:latest \
+            detect --source=/repo --verbose --redact
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Maven test on Java 21
+        run: mvn -B test
+
+      - name: Docker build
+        run: docker build -t java21-ci:local .
+
+      - name: Trivy image scan
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD:/work" \
+            aquasec/trivy:latest image \
+            --exit-code 0 \
+            --format table \
+            --output /work/trivy-report.txt \
+            java21-ci:local
+          # To fail the job on HIGH and CRITICAL, use:
+          # --exit-code 1 --severity HIGH,CRITICAL
+
+      - name: Read Trivy report
+        if: always()
+        run: cat trivy-report.txt
+
+      - name: Upload Trivy report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.txt

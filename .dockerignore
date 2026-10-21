@@ -1,0 +1,4 @@
+.git
+.github
+target
+trivy-report.txt

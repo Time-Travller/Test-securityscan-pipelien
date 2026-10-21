@@ -1,0 +1,4 @@
+target/
+trivy-report.txt
+.idea/
+*.iml
